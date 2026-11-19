@@ -1,0 +1,59 @@
+{
+  "_readme": "Copy to config.json and replace every EXAMPLE value. Inches throughout. Each measurement has target (ideal) and min/max (acceptable, including what a tailor can fix). Paste this whole file into the userscript's Settings box too; it reads only 'scrape' and 'designers'.",
+
+  "profile": {
+    "jacket": {
+      "size_label": "40R",
+      "also_accept_labels": ["40", "50R", "IT 50"],
+      "chest":    { "target": 40.0, "min": 39.0, "max": 41.5 },
+      "shoulder": { "target": 18.0, "min": 17.5, "max": 18.75 },
+      "sleeve":   { "target": 25.0, "min": 24.0, "max": 27.0 },
+      "length":   { "target": 30.0, "min": 29.0, "max": 31.0 }
+    },
+    "trousers": {
+      "waist":  { "target": 32.0, "min": 31.0, "max": 34.0 },
+      "inseam": { "target": 31.0, "min": 30.5, "max": 36.0 }
+    }
+  },
+
+  "designers": [
+    { "name": "Brioni" },
+    { "name": "Kiton" },
+    { "name": "Ermenegildo Zegna", "aliases": ["zegna"] },
+    { "name": "Tom Ford" },
+    { "name": "Giorgio Armani", "aliases": ["armani collezioni"] },
+    { "name": "Canali" }
+  ],
+
+  "max_price": 800,
+  "min_condition": "Very Good",
+  "exclude_final_sale": false,
+
+  "fabrics": {
+    "include_any": ["wool", "cashmere", "mohair", "linen", "silk", "flannel", "tweed"],
+    "exclude": ["polyester"],
+    "require_known": false
+  },
+
+  "scoring": {
+    "min_comps": 4,
+    "weight_comps": 1.0,
+    "weight_retail": 0.7,
+    "markdown_weight": 0.25,
+    "final_sale_penalty": 5,
+    "wear_notes_penalty": 3,
+    "fit_unverified_penalty": 8
+  },
+
+  "scrape": {
+    "_note": "price_to is deliberately higher than max_price so designer medians are not truncated at your budget.",
+    "searches": ["mens suit"],
+    "add_designer_searches": true,
+    "price_to": 2500,
+    "url_filter": "/products/men/clothing/suiting/",
+    "max_pages_per_search": 10,
+    "product_mode": "fetch",
+    "refetch_after_hours": 24,
+    "delay_ms": [2500, 6000]
+  }
+}

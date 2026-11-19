@@ -1,0 +1,6 @@
+config.json
+data/*.json
+report.html
+report.csv
+__pycache__/
+node_modules/
