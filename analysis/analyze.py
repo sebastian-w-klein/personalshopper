@@ -187,9 +187,12 @@ def assess_fit(meas: dict, size: dict, profile: dict) -> Fit:
     want = parse_size_label((profile.get("jacket") or {}).get("size_label"))
     alt = [parse_size_label(s) for s in (profile.get("jacket") or {}).get("also_accept_labels", [])]
     if size and want:
-        for w in [want] + alt:
-            if w.get("num") and size.get("num") == w["num"] and (not w.get("len") or not size.get("len") or w["len"] == size["len"]):
-                return Fit("unverified", 0.6, ["label match only, no measurements"])
+        accepted = [want] + alt
+        nums = {w.get("num") for w in accepted if w.get("num")}
+        lens = {w["len"] for w in accepted if w.get("len")}
+        # A length letter on the item (S/R/L) must be one we accept; no letter → number match is enough.
+        if size.get("num") in nums and (not size.get("len") or not lens or size["len"] in lens):
+            return Fit("unverified", 0.6, ["label match only, no measurements"])
         return Fit("fails", 0.0, ["size label mismatch"])
     return Fit("unverified", 0.3, ["no size info"])
 
