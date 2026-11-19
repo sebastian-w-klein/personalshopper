@@ -4,3 +4,6 @@ report.html
 report.csv
 __pycache__/
 node_modules/
+handbags.json
+bags.html
+bags.csv

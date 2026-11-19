@@ -57,6 +57,29 @@ Markdown % comes from the item's own price history, or from the struck-through o
 
 > Comps are only as good as the data you collect. That's why `scrape.price_to` is set well above your `max_price`: if you only collect items under budget, every designer median gets dragged down and nothing looks cheap.
 
+## Handbags
+
+[`handbags.example.json`](handbags.example.json) is a spec for searching handbags instead of suits (`"category": "handbags"`). Copy it to `handbags.json` and edit:
+
+| Spec | What it does |
+|---|---|
+| `bag.styles` | shoulder, crossbody, tote, top handle, flap, clutch, … (`include_any` / `exclude`) |
+| `bag.colors` | read from the title first, then the description (hardware and lining wording is ignored) |
+| `bag.materials` | lambskin, calfskin (incl. Togo/Epsom/…), caviar, suede, canvas, nylon, exotic, … |
+| `bag.hardware` | gold, silver, palladium, ruthenium, … |
+| `bag.size_words` | nano / mini / small / medium / PM / MM / GM… in the title |
+| `bag.dimensions` | width, height, depth, handle_drop, strap_drop in inches. These are hard limits because bags can't be tailored. `require_dimensions` decides whether listings without measurements are dropped or marked unverified |
+| `designers[].models` | e.g. Lady Dior, Saddle, Classic Flap. Comps are grouped by designer + model (or by style if no model is found). `models_only` keeps only listed models |
+| `exclude_keywords`, `prefer_includes` | drop listings mentioning e.g. "repair"; small bonus for dust bag / box / authenticity card |
+
+The pricing score is the same as for suits. To scan for bags, paste `handbags.json` into the userscript's Settings box and click Start scan. Designer searches use `designer_search_suffix` (e.g. "Chanel bag"). Paste `config.json` back in for suits. Export as usual, then:
+
+```bash
+python analysis/analyze.py --config handbags.json --out bags data/*.json
+```
+
+Each config only analyses listings whose URL matches its `scrape.url_filter`, so suit and bag exports can sit together in `data/`. The bag URL pattern hasn't been checked against a live listing, so look at one bag's URL and adjust the regex if needed.
+
 ## Caveats
 
 - The product-page parser is text-based and was written without a live page to calibrate against. If a field comes back empty, open a listing, click **Copy page lines**, and fix the matching regex in `parseProductLines` (add the real lines as a test case in `tests/parser.test.js`).

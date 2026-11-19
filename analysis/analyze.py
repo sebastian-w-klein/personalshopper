@@ -24,18 +24,55 @@ from pathlib import Path
 CONDITION_ORDER = ["Fair", "Good", "Very Good", "Excellent", "Pristine"]
 DEFAULT_CONDITION_FACTOR = {"Pristine": 1.0, "Excellent": 0.92, "Very Good": 0.82, "Good": 0.68, "Fair": 0.5}
 
-# Measurement label aliases as they may appear under "Estimated item measurements".
+# Measurement label aliases as they may appear under "Estimated item measurements", per category.
 MEASURE_ALIASES = {
-    "chest": ["chest", "bust", "pit to pit", "pit-to-pit", "chest width"],
-    "shoulder": ["shoulder", "shoulders", "shoulder to shoulder", "shoulder width", "across shoulders"],
-    "sleeve": ["sleeve", "sleeves", "sleeve length"],
-    "length": ["length", "jacket length", "back length", "body length"],
-    "waist": ["waist", "trouser waist", "pant waist", "pants waist"],
-    "inseam": ["inseam", "inside leg"],
-    "rise": ["rise", "front rise"],
-    "leg_opening": ["leg opening", "hem", "leg"],
+    "suits": {
+        "chest": ["chest", "bust", "pit to pit", "pit-to-pit", "chest width"],
+        "shoulder": ["shoulder", "shoulders", "shoulder to shoulder", "shoulder width", "across shoulders"],
+        "sleeve": ["sleeve", "sleeves", "sleeve length"],
+        "length": ["length", "jacket length", "back length", "body length"],
+        "waist": ["waist", "trouser waist", "pant waist", "pants waist"],
+        "inseam": ["inseam", "inside leg"],
+        "rise": ["rise", "front rise"],
+        "leg_opening": ["leg opening", "hem", "leg"],
+    },
+    "handbags": {
+        "height": ["height"],
+        "width": ["width", "length"],
+        "depth": ["depth", "gusset", "base depth"],
+        "handle_drop": ["handle drop", "top handle drop", "handles drop", "handle"],
+        "strap_drop": ["shoulder strap drop", "strap drop", "shoulder drop", "crossbody strap drop", "strap"],
+    },
 }
-_ALIAS_LOOKUP = {a: k for k, al in MEASURE_ALIASES.items() for a in al}
+_ALIAS_LOOKUP = {cat: {a: k for k, al in tbl.items() for a in al} for cat, tbl in MEASURE_ALIASES.items()}
+
+# Default handbag vocabulary (override/extend under "bag.vocab" in the config).
+BAG_VOCAB = {
+    "styles": {
+        "shoulder": ["shoulder bag"], "crossbody": ["crossbody", "cross-body", "messenger"],
+        "tote": ["tote", "shopper"], "top handle": ["top handle", "top-handle", "handle bag"],
+        "satchel": ["satchel", "doctor"], "clutch": ["clutch", "pouch", "minaudière", "minaudiere"],
+        "hobo": ["hobo"], "bucket": ["bucket"], "backpack": ["backpack"], "belt bag": ["belt bag", "waist bag", "fanny"],
+        "flap": ["flap"], "wallet on chain": ["wallet on chain", "woc"], "baguette": ["baguette"],
+        "camera": ["camera bag"], "duffle": ["duffle", "duffel", "weekender", "keepall"],
+    },
+    "colors": ["black", "white", "ivory", "cream", "beige", "taupe", "grey", "gray", "tan", "camel", "brown",
+               "cognac", "chocolate", "burgundy", "bordeaux", "red", "pink", "orange", "yellow", "green", "olive",
+               "khaki", "blue", "navy", "purple", "silver", "gold", "metallic", "multicolor", "neutral", "nude",
+               "monogram", "damier", "logo"],
+    "materials": {
+        "lambskin": ["lambskin"], "calfskin": ["calfskin", "box calf", "togo", "epsom", "clemence", "swift"],
+        "caviar": ["caviar"], "patent": ["patent"], "suede": ["suede", "nubuck"], "leather": ["leather"],
+        "canvas": ["canvas", "coated canvas"], "nylon": ["nylon", "re-nylon", "tessuto"], "raffia": ["raffia", "straw", "wicker"],
+        "denim": ["denim"], "tweed": ["tweed", "bouclé", "boucle"], "velvet": ["velvet"], "shearling": ["shearling"],
+        "exotic": ["python", "crocodile", "alligator", "ostrich", "lizard", "snakeskin", "exotic"],
+        "intrecciato": ["intrecciato", "woven", "braided"],
+    },
+    "hardware": ["gold", "silver", "palladium", "ruthenium", "gunmetal", "brass", "rose gold"],
+    "size_words": ["nano", "micro", "mini", "small", "medium", "large", "jumbo", "maxi", "pm", "mm", "gm", "bb"],
+    "includes": ["dust bag", "box", "authenticity card", "certificate", "shoulder strap", "lock", "keys",
+                 "clochette", "raincoat", "receipt", "insert", "pouch"],
+}
 
 DEFAULT_SCORING = {
     "min_comps": 4,
@@ -80,18 +117,22 @@ def load_items(paths: list[str]) -> list[dict]:
 # ---------------------------------------------------------------- normalisation
 
 
-def norm_measurements(raw: dict | None) -> tuple[dict, list[str]]:
-    """Map labels to canonical keys; convert flat (half) chest/waist to full circumference."""
+def norm_measurements(raw: dict | None, category: str = "suits") -> tuple[dict, list[str]]:
+    """Map labels to canonical keys; for suits convert flat (half) chest/waist to full circumference."""
+    lookup = _ALIAS_LOOKUP[category]
+    by_len = sorted(lookup.items(), key=lambda kv: -len(kv[0]))
     out, notes = {}, []
     for label, val in (raw or {}).items():
         if val is None:
             continue
         lab = re.sub(r"\s+", " ", label.lower()).strip()
-        key = _ALIAS_LOOKUP.get(lab)
+        key = lookup.get(lab)
         if key is None:
-            key = next((k for a, k in _ALIAS_LOOKUP.items() if lab.startswith(a)), None)
+            key = next((k for a, k in by_len if lab.startswith(a)), None)
         if key and key not in out:
             out[key] = float(val)
+    if category != "suits":
+        return out, notes
     if "chest" in out and out["chest"] < 30:
         out["chest"] *= 2
         notes.append("chest measured flat, doubled")
@@ -133,12 +174,57 @@ def norm_designers(cfg_designers: list) -> list[dict]:
         if isinstance(d, str):
             d = {"name": d}
         aliases = [a.lower() for a in d.get("aliases", [])] + [d["name"].lower()]
-        out.append({"name": d["name"], "aliases": sorted(set(aliases), key=len, reverse=True)})
+        out.append({"name": d["name"], "aliases": sorted(set(aliases), key=len, reverse=True),
+                    "models": d.get("models", [])})
     return out
 
 
 def wants_designer(d: str | None, designers: list[dict]) -> bool:
     return not designers or any(d == x["name"] for x in designers)
+
+
+def _has(text: str, word: str) -> bool:
+    return re.search(r"(?<![a-z])" + re.escape(word.lower()) + r"(?![a-z])", text) is not None
+
+
+def bag_attrs(it: dict, bag_cfg: dict, designer: dict | None) -> dict:
+    """Detect style / colour / material / hardware / size word / inclusions / model from listing text."""
+    vocab = {**BAG_VOCAB, **(bag_cfg.get("vocab") or {})}
+    title = (it.get("title") or "").lower()
+    text = "\n".join(filter(None, [it.get("title"), it.get("description")])).lower()
+    find_map = lambda m: sorted({k for k, syns in m.items() if any(_has(text, s) for s in syns)})
+    find_list = lambda ws, src=text: sorted({w for w in ws if _has(src, w)})
+    hw = sorted({h for h in vocab["hardware"]
+                 if re.search(re.escape(h) + r"[- ]?(tone )?hardware", text)})
+    models = (designer or {}).get("models") or []
+    model = next((m for m in sorted(models, key=len, reverse=True) if _has(text, m)), None)
+    return {
+        "styles": find_map(vocab["styles"]),
+        # Colour from the title first (descriptions often mention lining/trim colours).
+        "colors": find_list(vocab["colors"], title) or find_list(
+            vocab["colors"], re.sub(r"[a-z]+[- ]?(tone )?hardware|lining|interior[^\n]*", " ", text)),
+        "materials": find_map(vocab["materials"]),
+        "hardware": hw,
+        "size_words": find_list(vocab["size_words"], title),
+        "includes": find_list(vocab["includes"]),
+        "model": model,
+    }
+
+
+def check_any(found: list[str] | set[str], rule: dict | None, label: str, require_known: bool = False) -> list[str]:
+    """rule = {include_any: [...], exclude: [...]} → reasons this item is excluded."""
+    rule = rule or {}
+    found = {f.lower() for f in found}
+    inc = {x.lower() for x in rule.get("include_any", [])}
+    exc = {x.lower() for x in rule.get("exclude", [])}
+    out = []
+    if exc & found:
+        out.append(f"{label}: {', '.join(sorted(exc & found))}")
+    if inc and found and not inc & found:
+        out.append(f"{label} not wanted")
+    if inc and not found and (require_known or rule.get("require_known")):
+        out.append(f"{label} unknown")
+    return out
 
 
 def item_fabrics(it: dict) -> set[str]:
@@ -160,10 +246,22 @@ class Fit:
     reasons: list[str] = field(default_factory=list)
 
 
-def assess_fit(meas: dict, size: dict, profile: dict) -> Fit:
+def assess_bag_dims(meas: dict, dims: dict, require: bool) -> Fit:
+    """Dimensions are hard limits (no tailoring), so any measured dim out of range fails."""
+    dims = {k: v for k, v in dims.items() if isinstance(v, dict)}
+    fit = assess_fit(meas, {}, {"bag": dims}, parts=("bag",), core=tuple(dims))
+    if fit.status == "unverified" and not any(d in meas for d in dims):
+        fit = Fit("fails" if require else "unverified", 0.0 if require else 0.4, ["no dimensions listed"])
+    elif fit.status == "unverified":
+        missing = [d for d in dims if d not in meas]
+        fit = Fit("fits", fit.score, fit.reasons[:-1] + [f"not listed: {', '.join(missing)}"])
+    return fit
+
+
+def assess_fit(meas: dict, size: dict, profile: dict, parts=("jacket", "trousers"), core=("chest", "shoulder")) -> Fit:
     """Each profile dim is {target, min, max}; min/max should include alteration room."""
     reasons, devs, checked = [], [], 0
-    for part in ("jacket", "trousers"):
+    for part in parts:
         for dim, spec in (profile.get(part) or {}).items():
             if not isinstance(spec, dict) or dim not in meas:
                 continue
@@ -178,10 +276,10 @@ def assess_fit(meas: dict, size: dict, profile: dict) -> Fit:
                 if abs(v - spec["target"]) > 0.5:
                     reasons.append(f"{dim} {v:g}\" (target {spec['target']:g})")
     if checked:
-        has_core = any(k in meas for k in ("chest", "shoulder"))
+        has_core = all(k in meas for k in core) if parts == ("bag",) else any(k in meas for k in core)
         status = "fits" if has_core else "unverified"
         if not has_core:
-            reasons.append("no chest/shoulder measurement")
+            reasons.append(f"missing {'/'.join(core)} measurement")
         return Fit(status, 1 - (sum(devs) / len(devs) if devs else 0), reasons)
     # No usable measurements: fall back to the label.
     want = parse_size_label((profile.get("jacket") or {}).get("size_label"))
@@ -208,22 +306,40 @@ def analyze(items: list[dict], cfg: dict) -> list[dict]:
     sc = {**DEFAULT_SCORING, **(cfg.get("scoring") or {})}
     cf = {**DEFAULT_CONDITION_FACTOR, **(sc.get("condition_factor") or {})}
     designers = norm_designers(cfg.get("designers"))
+    dmap = {d["name"]: d for d in designers}
     profile = cfg.get("profile") or {}
+    category = cfg.get("category", "suits")
+    is_bag = category == "handbags"
+    bag_cfg = cfg.get("bag") or {}
+    # Only analyse listings from this category's URLs, so suit and bag comps never mix.
+    url_pat = cfg.get("url_filter") or (cfg.get("scrape") or {}).get("url_filter")
 
     rows = []
     for it in items:
         if it.get("price") in (None, 0):
             continue
-        meas, mnotes = norm_measurements(it.get("measurements"))
-        size = parse_size_label(it.get("size_label"))
+        if url_pat and it.get("url") and not re.search(url_pat, it["url"]):
+            continue
+        meas, mnotes = norm_measurements(it.get("measurements"), category)
+        size = parse_size_label(it.get("size_label")) if not is_bag else {}
         cond = it.get("condition")
+        dname = canon_designer(it.get("designer"), it.get("title"), designers)
+        attrs = bag_attrs(it, bag_cfg, dmap.get(dname)) if is_bag else None
+        if is_bag:
+            bucket = attrs["model"] or (attrs["styles"][0] if attrs["styles"] else None)
+            bucket_label = f"model {bucket}" if attrs["model"] else f"style {bucket}"
+        else:
+            bucket = size.get("num") or size.get("alpha")
+            bucket_label = f"size {bucket}"
         rows.append({
             **it,
-            "designer_c": canon_designer(it.get("designer"), it.get("title"), designers),
+            "designer_c": dname,
             "meas": meas,
             "meas_notes": mnotes,
             "size": size,
-            "size_bucket": size.get("num") or size.get("alpha"),
+            "attrs": attrs,
+            "size_bucket": bucket,
+            "bucket_label": bucket_label,
             "cf": cf.get(cond, cf["Very Good"]),
             "norm_price": it["price"] / cf.get(cond, cf["Very Good"]),
         })
@@ -254,27 +370,51 @@ def analyze(items: list[dict], cfg: dict) -> list[dict]:
             why_not.append("final sale")
         if min_cond and r.get("condition") and CONDITION_ORDER.index(r["condition"]) < CONDITION_ORDER.index(min_cond):
             why_not.append("condition")
-        fabs = item_fabrics(r)
-        if exc and any(any(e in f for f in fabs) for e in exc):
-            why_not.append("excluded fabric")
-        if inc and fabs and not any(any(i in f for f in fabs) for i in inc):
-            why_not.append("fabric")
-        if inc and not fabs and fab_cfg.get("require_known"):
-            why_not.append("fabric unknown")
-        fit = assess_fit(r["meas"], r["size"], profile)
+        bonus = 0.0
+        if is_bag:
+            a = r["attrs"]
+            why_not += check_any(a["styles"], bag_cfg.get("styles"), "style")
+            why_not += check_any(a["colors"], bag_cfg.get("colors"), "color")
+            why_not += check_any(a["materials"], bag_cfg.get("materials"), "material")
+            why_not += check_any(a["hardware"], bag_cfg.get("hardware"), "hardware")
+            why_not += check_any(a["size_words"], bag_cfg.get("size_words"), "size")
+            if bag_cfg.get("models_only") and not a["model"]:
+                why_not.append("model not in list")
+            text = " ".join(filter(None, [r.get("title"), r.get("description")])).lower()
+            bad = [k for k in bag_cfg.get("exclude_keywords", []) if _has(text, k)]
+            if bad:
+                why_not.append("keyword: " + ", ".join(bad))
+            prefer = {p.lower() for p in bag_cfg.get("prefer_includes", [])}
+            bonus = min(3, len(prefer & set(a["includes"])))
+            fit = assess_bag_dims(r["meas"], bag_cfg.get("dimensions") or {}, bag_cfg.get("require_dimensions", False))
+            details = [x for x in [a["model"], *a["styles"], *a["colors"], *a["materials"]] if x]
+            details += [f"{h} hw" for h in a["hardware"]] + a["size_words"]
+            if a["includes"]:
+                details.append("incl. " + ", ".join(a["includes"]))
+            fabs = set()
+        else:
+            fabs = item_fabrics(r)
+            if exc and any(any(e in f for f in fabs) for e in exc):
+                why_not.append("excluded fabric")
+            if inc and fabs and not any(any(i in f for f in fabs) for i in inc):
+                why_not.append("fabric")
+            if inc and not fabs and fab_cfg.get("require_known"):
+                why_not.append("fabric unknown")
+            fit = assess_fit(r["meas"], r["size"], profile)
+            details = sorted(fabs)
         if fit.status == "fails":
-            why_not.append("fit: " + "; ".join(fit.reasons))
+            why_not.append(("dims: " if is_bag else "fit: ") + "; ".join(fit.reasons))
 
         # --- expected price
         peers = [p for p in by_designer.get(r["designer_c"] or "?", []) if p["key"] != r["key"]]
         size_peers = [p for p in peers if p["size_bucket"] and p["size_bucket"] == r["size_bucket"]]
         comp_basis, comp_med = None, median_or_none([p["norm_price"] for p in size_peers], sc["min_comps"])
         if comp_med is not None:
-            comp_basis = f"{len(size_peers)} {r['designer_c']} comps in size {r['size_bucket']}"
+            comp_basis = f"{len(size_peers)} {r['designer_c']} comps, {r['bucket_label']}"
         else:
             comp_med = median_or_none([p["norm_price"] for p in peers], sc["min_comps"])
             if comp_med is not None:
-                comp_basis = f"{len(peers)} {r['designer_c']} comps (all sizes)"
+                comp_basis = f"{len(peers)} {r['designer_c']} comps (all {'models' if is_bag else 'sizes'})"
         comp_expected = comp_med * r["cf"] if comp_med else None
 
         retail_expected, ratio_basis = None, None
@@ -308,7 +448,7 @@ def analyze(items: list[dict], cfg: dict) -> list[dict]:
                 score -= sc["wear_notes_penalty"]
             if fit.status == "unverified":
                 score -= sc["fit_unverified_penalty"]
-            score += 5 * (fit.score - 0.5)
+            score += 5 * (fit.score - 0.5) + bonus
 
         results.append({
             "key": r["key"],
@@ -323,6 +463,8 @@ def analyze(items: list[dict], cfg: dict) -> list[dict]:
             "fit_score": round(fit.score, 2),
             "fit_notes": fit.reasons,
             "fabrics": sorted(fabs),
+            "details": details,
+            "model": (r["attrs"] or {}).get("model"),
             "condition": r.get("condition"),
             "condition_notes": r.get("condition_notes"),
             "final_sale": bool(r.get("final_sale")),
@@ -350,7 +492,7 @@ def analyze(items: list[dict], cfg: dict) -> list[dict]:
 
 CSV_COLS = ["score", "candidate", "designer", "title", "size_label", "fit", "condition", "final_sale", "price",
             "expected", "discount_vs_expected", "est_retail", "retail_discount", "markdown_pct", "n_markdowns",
-            "comp_basis", "retail_basis", "fabrics", "measurements", "excluded_because", "url", "key"]
+            "comp_basis", "retail_basis", "details", "measurements", "excluded_because", "url", "key"]
 
 
 def write_csv(results: list[dict], path: Path) -> None:
@@ -365,7 +507,7 @@ def pct(x):
     return "" if x is None else f"{x:.0%}"
 
 
-def write_html(results: list[dict], path: Path, show_all: bool) -> None:
+def write_html(results: list[dict], path: Path, show_all: bool, title: str = "suits") -> None:
     rows = [r for r in results if r["candidate"] or show_all]
     e = html.escape
     trs = []
@@ -380,22 +522,22 @@ def write_html(results: list[dict], path: Path, show_all: bool) -> None:
   <div class="sub">{e(r['key'])}{' · FINAL SALE' if r['final_sale'] else ''}{(' · ' + e(why)) if why else ''}</div></td>
 <td>{e(r['size_label'] or '')}<div class="sub">{e(meas)}</div><div class="sub">{e(r['fit'])}{(': ' + e('; '.join(r['fit_notes']))) if r['fit_notes'] else ''}</div></td>
 <td>{e(r['condition'] or '')}<div class="sub">{e(r['condition_notes'] or '')}</div></td>
-<td>{e(', '.join(r['fabrics']))}</td>
+<td>{e(', '.join(r['details']))}</td>
 <td data-v="{r['price']}">${r['price']:,.0f}</td>
 <td data-v="{r['expected'] or ''}">{'' if r['expected'] is None else f"${r['expected']:,}"}<div class="sub">{e(basis)}</div></td>
 <td data-v="{r['discount_vs_expected'] if r['discount_vs_expected'] is not None else ''}">{pct(r['discount_vs_expected'])}</td>
 <td data-v="{r['est_retail'] or ''}">{'' if not r['est_retail'] else f"${r['est_retail']:,.0f}"}<div class="sub">{pct(r['retail_discount'])} off</div></td>
 <td data-v="{r['markdown_pct']}">{pct(r['markdown_pct'])}<div class="sub">{r['n_markdowns']}× seen</div></td>
 </tr>""")
-    doc = f"""<!DOCTYPE html><html><head><meta charset="utf-8"><title>TRR suit report</title>
+    doc = f"""<!DOCTYPE html><html><head><meta charset="utf-8"><title>TRR {e(title)} report</title>
 <style>
 body{{font:13px system-ui,sans-serif;margin:16px;color:#222}} table{{border-collapse:collapse;width:100%}}
 th,td{{border-bottom:1px solid #ddd;padding:6px;vertical-align:top;text-align:left}} th{{cursor:pointer;background:#f5f5f5;position:sticky;top:0}}
 img{{width:70px}} .sub{{color:#777;font-size:11px}} tr.excl{{opacity:.45}} a{{color:#124;text-decoration:none}}
 </style></head><body>
-<h2>TRR suit report</h2><p>{sum(r['candidate'] for r in results)} candidates of {len(results)} listings. Click a header to sort.
+<h2>TRR {e(title)} report</h2><p>{sum(r['candidate'] for r in results)} candidates of {len(results)} listings. Click a header to sort.
 Score ≈ % below expected price + markdown bonus − penalties.</p>
-<table><thead><tr><th>Score</th><th></th><th>Item</th><th>Size / fit</th><th>Condition</th><th>Fabric</th><th>Price</th>
+<table><thead><tr><th>Score</th><th></th><th>Item</th><th>Size / fit</th><th>Condition</th><th>Details</th><th>Price</th>
 <th>Expected</th><th>Below exp.</th><th>Est. retail</th><th>Markdown</th></tr></thead><tbody>
 {''.join(trs)}</tbody></table>
 <script>
@@ -426,13 +568,13 @@ def main(argv=None) -> int:
     results = analyze(items, cfg)
     out = Path(a.out)
     write_csv(results, out.with_suffix(".csv"))
-    write_html(results, out.with_suffix(".html"), a.all)
+    write_html(results, out.with_suffix(".html"), a.all, cfg.get("category", "suits"))
 
     cands = [r for r in results if r["candidate"]]
     print(f"{len(items)} listings from {len(paths)} file(s); {len(cands)} candidates.")
     for r in cands[: a.top]:
         print(f"{r['score'] if r['score'] is not None else '  n/a':>6}  ${r['price']:>7,.0f}  exp {('$' + format(r['expected'], ',')) if r['expected'] else '   n/a':>8}"
-              f"  {(r['designer'] or '')[:18]:<18} {r['size_label'] or '':<8} {r['fit']:<10} {r['url']}")
+              f"  {(r['designer'] or '')[:18]:<18} {(r['size_label'] or r['model'] or '')[:12]:<12} {r['fit']:<10} {r['url']}")
     print(f"Wrote {out.with_suffix('.html')} and {out.with_suffix('.csv')}")
     return 0
 

@@ -336,7 +336,8 @@
   function buildSearchUrls() {
     const c = cfg();
     const kws = (c.searches || []).slice();
-    if (c.add_designer_searches) (S.config.designers || []).forEach((d) => kws.push(`${d.name || d} suit`));
+    const suffix = c.designer_search_suffix != null ? c.designer_search_suffix : 'suit';
+    if (c.add_designer_searches) (S.config.designers || []).forEach((d) => kws.push(`${d.name || d} ${suffix}`.trim()));
     return [...new Set(kws)].map((k) => {
       const u = new URL('/products', location.origin);
       u.searchParams.set('keywords', k);

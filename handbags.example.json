@@ -1,0 +1,107 @@
+{
+  "_readme": "Handbag search spec. Copy to handbags.json, edit, and paste into the userscript's Settings box before a bag scan (it replaces the suit config there; re-paste config.json to go back). Analyse with: python analysis/analyze.py --config handbags.json --out bags data/*.json. Every list filter takes include_any (keep only items matching at least one; items where nothing was detected pass) and exclude (drop items matching any). Delete a filter or leave its lists empty to allow everything.",
+
+  "category": "handbags",
+
+  "bag": {
+    "styles": {
+      "_options": "shoulder, crossbody, tote, top handle, satchel, clutch, hobo, bucket, backpack, belt bag, flap, wallet on chain, baguette, camera, duffle",
+      "include_any": ["shoulder", "crossbody", "top handle", "flap"],
+      "exclude": ["backpack", "belt bag", "duffle"]
+    },
+
+    "colors": {
+      "_options": "black, white, ivory, cream, beige, taupe, grey, tan, camel, brown, cognac, chocolate, burgundy, bordeaux, red, pink, orange, yellow, green, olive, khaki, blue, navy, purple, silver, gold, metallic, multicolor, neutral, nude, monogram, damier, logo",
+      "include_any": ["black", "brown", "tan", "camel", "cognac", "burgundy", "taupe", "navy"],
+      "exclude": ["multicolor", "logo"]
+    },
+
+    "materials": {
+      "_options": "lambskin, calfskin (incl. togo/epsom/clemence/swift/box), caviar, patent, suede, leather, canvas, nylon, raffia, denim, tweed, velvet, shearling, exotic, intrecciato",
+      "include_any": ["calfskin", "caviar", "lambskin", "leather", "suede", "intrecciato"],
+      "exclude": ["exotic", "patent", "raffia"],
+      "require_known": false
+    },
+
+    "hardware": {
+      "_options": "gold, silver, palladium, ruthenium, gunmetal, brass, rose gold",
+      "include_any": [],
+      "exclude": []
+    },
+
+    "size_words": {
+      "_note": "Matched in the title only (e.g. 'Medium Classic Flap', 'Neverfull MM').",
+      "include_any": [],
+      "exclude": ["nano", "micro"]
+    },
+
+    "dimensions": {
+      "_note": "Inches, from TRR's 'Estimated item measurements'. Unlike suits these are hard limits, because a bag can't be tailored. target is optional and only affects ranking.",
+      "width":      { "target": 10.5, "min": 8.0, "max": 13.0 },
+      "height":     { "min": 5.5, "max": 10.0 },
+      "depth":      { "max": 5.5 },
+      "strap_drop": { "min": 18.0 }
+    },
+    "require_dimensions": false,
+
+    "models_only": false,
+    "exclude_keywords": ["replica of", "as is", "repair", "odor"],
+    "prefer_includes": ["dust bag", "box", "authenticity card"],
+
+    "vocab": {
+      "_note": "Optional: override any built-in word list (styles, colors, materials, hardware, size_words, includes). Remove this block to use the defaults."
+    }
+  },
+
+  "_designers_note": "models are matched in the title/description and used to group comps (e.g. Lady Dior vs Saddle). Longest names match first.",
+  "designers": [
+    { "name": "Chanel", "models": ["Classic Flap", "Classic Double Flap", "Reissue 2.55", "2.55", "Boy", "19", "Wallet on Chain", "Gabrielle", "Coco Handle", "Deauville", "Trendy CC"] },
+    { "name": "Hermès", "aliases": ["hermes"], "models": ["Birkin", "Kelly", "Constance", "Evelyne", "Picotin", "Lindy", "Garden Party", "Herbag", "Bolide", "Jypsiere"] },
+    { "name": "Louis Vuitton", "aliases": ["lv"], "models": ["Neverfull", "Speedy", "Alma", "Pochette Métis", "Pochette Metis", "Capucines", "Twist", "Petite Malle", "Noé", "Noe", "Favorite", "Multi Pochette"] },
+    { "name": "Dior", "aliases": ["christian dior"], "models": ["Lady Dior", "Saddle", "Book Tote", "30 Montaigne", "Bobby", "Caro", "Diorama"] },
+    { "name": "Saint Laurent", "aliases": ["yves saint laurent", "ysl"], "models": ["Loulou", "Sac de Jour", "Kate", "Sunset", "Niki", "Le 5 à 7", "Le 5 a 7", "Envelope", "Muse"] },
+    { "name": "Celine", "aliases": ["céline"], "models": ["Luggage", "Belt", "Triomphe", "Classic Box", "Box", "Trapeze", "Ava", "Sangle", "16"] },
+    { "name": "Bottega Veneta", "models": ["Jodie", "Cassette", "The Pouch", "Pouch", "Arco", "Andiamo", "Knot", "Veneta", "Sardine"] },
+    { "name": "Loewe", "models": ["Puzzle", "Hammock", "Flamenco", "Gate", "Basket", "Amazona"] },
+    { "name": "Prada", "models": ["Galleria", "Re-Edition", "Cleo", "Cahier", "Saffiano"] },
+    { "name": "Gucci", "models": ["Jackie", "Horsebit 1955", "Marmont", "Dionysus", "Bamboo", "Ophidia", "Sylvie"] },
+    { "name": "Fendi", "models": ["Baguette", "Peekaboo", "First", "Kan I", "Mon Tresor", "By The Way"] },
+    { "name": "The Row", "models": ["Margaux", "Park Tote", "Half Moon", "Sofia"] },
+    { "name": "Goyard", "models": ["Saint Louis", "Anjou", "Saigon", "Artois", "Belvedere"] },
+    { "name": "Balenciaga", "models": ["City", "Le Cagole", "Hourglass", "Neo Classic"] },
+    { "name": "Valentino", "aliases": ["valentino garavani"], "models": ["Rockstud", "Roman Stud", "VSling", "Locò", "Loco"] },
+    { "name": "Miu Miu", "models": ["Matelassé", "Matelasse", "Wander", "Arcadie"] },
+    { "name": "Givenchy", "models": ["Antigona", "Pandora", "Cut Out", "Voyou"] },
+    { "name": "Chloé", "aliases": ["chloe"], "models": ["Marcie", "Faye", "Drew", "Tess", "Woody", "Paddington"] },
+    { "name": "Alaïa", "aliases": ["alaia"], "models": ["Le Teckel", "Le Coeur"] },
+    { "name": "Khaite" },
+    { "name": "Mulberry", "models": ["Bayswater", "Alexa", "Lily"] }
+  ],
+
+  "max_price": 2000,
+  "min_condition": "Very Good",
+  "exclude_final_sale": false,
+
+  "scoring": {
+    "min_comps": 4,
+    "weight_comps": 1.0,
+    "weight_retail": 0.7,
+    "markdown_weight": 0.25,
+    "final_sale_penalty": 5,
+    "wear_notes_penalty": 3,
+    "fit_unverified_penalty": 4
+  },
+
+  "scrape": {
+    "_note": "url_filter is a regex. TRR's bag URL path wasn't checked live, so it's deliberately loose. Adjust it after looking at a real bag URL. price_to is above max_price so comps aren't truncated.",
+    "searches": ["handbag", "shoulder bag", "crossbody bag"],
+    "add_designer_searches": true,
+    "designer_search_suffix": "bag",
+    "price_to": 6000,
+    "url_filter": "/products/(women|men)/(handbags|bags|accessories/bags)/",
+    "max_pages_per_search": 4,
+    "product_mode": "fetch",
+    "refetch_after_hours": 24,
+    "delay_ms": [2500, 6000]
+  }
+}

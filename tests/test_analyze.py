@@ -14,7 +14,7 @@ CFG = json.loads((Path(__file__).resolve().parent.parent / "config.example.json"
 def item(key, designer, price, retail=None, cond="Excellent", size="40R", meas=None, hist=None, **kw):
     return {"key": key, "designer": designer, "title": f"{designer} Wool Suit", "price": price, "est_retail": retail,
             "condition": cond, "size_label": size, "measurements": meas or {}, "fabrics": ["wool"],
-            "price_history": hist or [{"t": "2026-11-01", "price": price}], "url": f"https://x/{key}", **kw}
+            "price_history": hist or [{"t": "2026-11-01", "price": price}], "url": f"https://www.therealreal.com/products/men/clothing/suiting/{key.lower()}", **kw}
 
 
 GOOD_MEAS = {"chest": 20, "shoulder": 18, "sleeve": 25, "length": 30, "waist": 32, "inseam": 31}
